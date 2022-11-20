@@ -3,10 +3,14 @@ from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread
 from time import sleep
 
+from descriptors import Port
+from metaclasses import ClientVerifier
 from utils import get_host_port
 
 
-class Client:
+class Client(metaclass=ClientVerifier):
+    port = Port()
+
     def __init__(self):
         self.host, self.port = get_host_port()
 

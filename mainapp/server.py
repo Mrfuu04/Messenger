@@ -1,12 +1,15 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from select import select
 
-from metaclasses import ClientVerifier
+from descriptors import Port
+from metaclasses import ServerVerifier
 from utils import get_host_port
 import settings
 
 
-class Server(metaclass=ClientVerifier):
+class Server(metaclass=ServerVerifier):
+    port = Port()
+
     def __init__(self):
         self.host, self.port = get_host_port()
         self.client_sockets = []
