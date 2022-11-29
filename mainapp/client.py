@@ -1,11 +1,13 @@
 import sys
 from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 from descriptors import Port
+from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, USER, ACCOUNT_NAME, TIME, MESSAGE, DESTINATION, \
+    RESPONSE_USED_NAME, EXIT, SERVER
 from metaclasses import ClientVerifier
-from utils import get_host_port
+from common.utils import get_host_port, get_message, send_message
 
 
 class Client(metaclass=ClientVerifier):
@@ -18,16 +20,17 @@ class Client(metaclass=ClientVerifier):
         with socket(AF_INET, SOCK_STREAM) as client_sock:
             try:
                 client_sock.connect((self.host, self.port))
-            except ConnectionRefusedError as e:
+            except ConnectionRefusedError:
                 sys.exit(1)
-            except OSError as e:
+            except OSError:
                 print('Подключение уже установлено')
+
+            self.login(client_sock)
 
             user_interface_thread = Thread(
                 target=self.user_interface, args=(client_sock,), daemon=True)
             reciever_interface_thread = Thread(
                 target=self.reciever_interface, args=(client_sock,), daemon=True)
-            print('Для выхода введите exit')
             user_interface_thread.start()
             reciever_interface_thread.start()
             while True:
@@ -38,16 +41,78 @@ class Client(metaclass=ClientVerifier):
                 break
 
     def reciever_interface(self, sock):
+        """Интерфейс получения сообщения"""
         while True:
-            data = sock.recv(4096)
-            print(data.decode('utf-8'))
+            message = get_message(sock)
+            print(f'{message[SENDER]}: {message[MESSAGE_TEXT]}')
 
     def user_interface(self, sock):
+        """Интерфейс пользовательского ввода"""
+        print('*** Для вывода всех доступных команд введите help ***')
         while True:
-            message = input()
-            if message == 'exit':
+            command = input('Введите команду: ')
+            if command == 'help':
+                self.get_help_message()
+            elif command == 'message':
+                destination = input('Введите имя получателя: ')
+                message = self.create_message(self.username, destination)
+                send_message(sock, message)
+            elif command == 'exit':
+                message = self.create_exit_message(self.username)
+                send_message(sock, message)
+                print('Good bye!')
+                sleep(3)
+                exit(0)
+
+    def login(self, sock):
+        while True:
+            self.username = input('Введите имя пользователя: ')
+            presence = self.create_presence(self.username)
+            send_message(sock, presence)
+            presence_response = get_message(sock)
+            if presence_response == RESPONSE_USED_NAME:
+                print(RESPONSE_USED_NAME[MESSAGE])
+            else:
                 break
-            sock.send(message.encode('utf-8'))
+
+    def create_presence(self, username):
+        """Создает словарь представение клиента"""
+        message = {
+            ACTION: PRESENCE,
+            TIME: time(),
+            SENDER: username,
+            DESTINATION: SERVER,
+        }
+        return message
+
+    def create_message(self, sender, destination):
+        """Создает словарь сообщение клиент-клиент"""
+        msg_text = input('Введите сообщение: ')
+        message = {
+            ACTION: MESSAGE,
+            TIME: time(),
+            SENDER: sender,
+            DESTINATION: destination,
+            MESSAGE_TEXT: msg_text,
+        }
+        return message
+
+    def create_exit_message(self, username):
+        """Создает словарь выхода из мессенджеа"""
+        message = {
+            ACTION: EXIT,
+            TIME: time(),
+            SENDER: username,
+            DESTINATION: SERVER,
+        }
+        return message
+
+    def get_help_message(self):
+        print(
+            "help - вывод всех доступных комманд\n"
+            "message - написать сообщение пользователю\n"
+            "exit - выйти из программы\n"
+        )
 
 
 if __name__ == '__main__':

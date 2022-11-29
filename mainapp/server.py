@@ -1,10 +1,13 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from select import select
+from time import sleep
 
 from descriptors import Port
+from common.variables import MAX_PACKAGE_SIZE, ACTION, PRESENCE, USER, ACCOUNT_NAME, RESPONSE_200, \
+    ERROR, RESPONSE_USED_NAME, SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT
 from metaclasses import ServerVerifier
-from utils import get_host_port
-import settings
+from common.utils import get_host_port, send_message, get_message
+from common import variables
 
 
 class Server(metaclass=ServerVerifier):
@@ -14,12 +17,13 @@ class Server(metaclass=ServerVerifier):
         self.host, self.port = get_host_port()
         self.client_sockets = []
         self.messages = []
+        self.names = dict()
 
     def run(self):
         with socket(AF_INET, SOCK_STREAM) as server_sock:
             server_sock.bind((self.host, self.port))
-            server_sock.listen(settings.SERVER_MAX_LISTEN)
-            server_sock.settimeout(settings.SERVER_SETTIMEOUT)
+            server_sock.listen(variables.SERVER_MAX_LISTEN)
+            server_sock.settimeout(variables.SERVER_SETTIMEOUT)
 
             while True:
                 try:
@@ -42,19 +46,68 @@ class Server(metaclass=ServerVerifier):
                     if writers_list:
                         for writer in writers_list:
                             try:
-                                data = writer.recv(4096)
-                                message = data.decode('utf-8')
-                                self.messages.append(message)
+                                self.process_client_message(writer)
                             except Exception:
                                 self.client_sockets.remove(client)
-                    if getters_list and self.messages:
-                        message = self.messages[0]
-                        del self.messages[0]
-                        for getter in getters_list:
+                    for message in self.messages:
+                        try:
+                            self.process_message(message, getters_list)
+                        except ConnectionError:
                             try:
-                                getter.send(message.encode('utf-8'))
-                            except Exception:
-                                self.client_sockets.remove(getter)
+                                del self.names[message[DESTINATION]]
+                            except KeyError:
+                                pass
+                            self.client_sockets.remove(self.names[message[DESTINATION]])
+                    self.messages.clear()
+
+    def process_message(self, message, getters_list):
+        if message[DESTINATION] in self.names and self.names.get(message[DESTINATION]) in getters_list:
+            send_message(self.names[message[DESTINATION]], message)
+        elif message[DESTINATION] in self.names and self.names.get(DESTINATION) not in getters_list:
+            raise ConnectionError
+        else:
+            response = RESPONSE_400
+            response[MESSAGE_TEXT] = 'Пользователь не найден'
+            send_message(self.names[message[SENDER]], response)
+
+    def process_client_message(self, client_sock):
+        """
+        Парсит сообщение от клиентского
+        сокета и возвращает ответ.
+        В случае, если сообщение не вида клиент-клиент или оно
+        некорректно, то отправляет ответ пользователю
+        """
+        message = get_message(client_sock)
+        # Если сообщение представление, то отвечаем пользователю
+        if message[ACTION] == PRESENCE:
+            if message[SENDER] not in self.names.keys():
+                self.names[message[SENDER]] = client_sock
+                send_message(client_sock, RESPONSE_200)
+            else:
+                send_message(client_sock, RESPONSE_USED_NAME)
+
+            return
+        # Сообщение о выходе
+        elif message[ACTION] == EXIT:
+            self.names[message[SENDER]].close()
+            self.client_sockets.remove(self.names[message[SENDER]])
+            del self.names[message[SENDER]]
+
+            return
+        # Сообщение клиент-клиент
+        elif (message[ACTION] == MESSAGE and
+              message[SENDER] and
+              message[DESTINATION] and
+              message[TIME]):
+            self.messages.append(message)
+
+            return
+        else:
+            response = RESPONSE_400
+            response[MESSAGE_TEXT] = 'Некорректный запрос'
+            send_message(client_sock, response)
+
+            return
 
 
 if __name__ == '__main__':

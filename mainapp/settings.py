@@ -1,9 +1,0 @@
-# ---- MAIN SETTINGS ---- #
-HOST = 'localhost'
-PORT = 8080
-ENCODING = 'utf-8'
-
-# ---- SERVER SETTINGS ---- #
-SERVER_MAX_LISTEN = 5
-SERVER_SETTIMEOUT = 1
-
