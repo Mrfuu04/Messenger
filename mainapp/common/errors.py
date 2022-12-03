@@ -8,3 +8,9 @@ class GetMessageNoDictError(Exception):
 
     def __str__(self):
         return 'Получено письмо не ввиде словаря'
+
+
+class IncorrectDataRecievedError(Exception):
+
+    def __str__(self):
+        return 'Невозможно декодировать строку'

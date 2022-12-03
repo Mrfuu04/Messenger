@@ -5,7 +5,7 @@ from time import sleep, time
 
 from descriptors import Port
 from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, USER, ACCOUNT_NAME, TIME, MESSAGE, DESTINATION, \
-    RESPONSE_USED_NAME, EXIT, SERVER
+    EXIT, SERVER, RESPONSE_201
 from metaclasses import ClientVerifier
 from common.utils import get_host_port, get_message, send_message
 
@@ -17,34 +17,37 @@ class Client(metaclass=ClientVerifier):
         self.host, self.port = get_host_port()
 
     def run(self):
-        with socket(AF_INET, SOCK_STREAM) as client_sock:
-            try:
-                client_sock.connect((self.host, self.port))
-            except ConnectionRefusedError:
-                sys.exit(1)
-            except OSError:
-                print('Подключение уже установлено')
+        client_sock = socket(AF_INET, SOCK_STREAM)
+        try:
+            client_sock.connect((self.host, self.port))
+        except ConnectionRefusedError:
+            sys.exit(1)
+        except OSError:
+            print('Подключение уже установлено')
 
-            self.login(client_sock)
+        self.login(client_sock)
 
-            user_interface_thread = Thread(
-                target=self.user_interface, args=(client_sock,), daemon=True)
-            reciever_interface_thread = Thread(
-                target=self.reciever_interface, args=(client_sock,), daemon=True)
-            user_interface_thread.start()
-            reciever_interface_thread.start()
-            while True:
-                sleep(1)
-                if user_interface_thread.is_alive() and \
-                        reciever_interface_thread.is_alive():
-                    continue
-                break
+        user_interface_thread = Thread(
+            target=self.user_interface, args=(client_sock,), daemon=True)
+        reciever_interface_thread = Thread(
+            target=self.reciever_interface, args=(client_sock,), daemon=True)
+        user_interface_thread.start()
+        reciever_interface_thread.start()
+        while True:
+            sleep(1)
+            if user_interface_thread.is_alive() and \
+                    reciever_interface_thread.is_alive():
+                continue
+            break
 
     def reciever_interface(self, sock):
         """Интерфейс получения сообщения"""
         while True:
-            message = get_message(sock)
-            print(f'{message[SENDER]}: {message[MESSAGE_TEXT]}')
+            try:
+                message = get_message(sock)
+                print(f'{message[SENDER]}: {message[MESSAGE_TEXT]}')
+            except:
+                break
 
     def user_interface(self, sock):
         """Интерфейс пользовательского ввода"""
@@ -60,9 +63,8 @@ class Client(metaclass=ClientVerifier):
             elif command == 'exit':
                 message = self.create_exit_message(self.username)
                 send_message(sock, message)
-                print('Good bye!')
-                sleep(3)
-                exit(0)
+                sleep(2)
+                break
 
     def login(self, sock):
         while True:
@@ -70,9 +72,10 @@ class Client(metaclass=ClientVerifier):
             presence = self.create_presence(self.username)
             send_message(sock, presence)
             presence_response = get_message(sock)
-            if presence_response == RESPONSE_USED_NAME:
-                print(RESPONSE_USED_NAME[MESSAGE])
+            if presence_response == RESPONSE_201:
+                print(presence_response[MESSAGE_TEXT])
             else:
+                print(presence_response[MESSAGE_TEXT])
                 break
 
     def create_presence(self, username):
@@ -105,6 +108,7 @@ class Client(metaclass=ClientVerifier):
             SENDER: username,
             DESTINATION: SERVER,
         }
+
         return message
 
     def get_help_message(self):

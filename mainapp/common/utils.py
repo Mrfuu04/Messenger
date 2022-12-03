@@ -4,7 +4,7 @@ import sys
 # sys.path.append('..')
 from time import sleep
 
-from .errors import SendMessageNoDictError, GetMessageNoDictError
+from .errors import SendMessageNoDictError, GetMessageNoDictError, IncorrectDataRecievedError
 from .variables import HOST, PORT, ENCODING, MAX_PACKAGE_SIZE, MESSAGE_TEXT
 
 
@@ -24,9 +24,12 @@ def send_message(sock, message):
 def get_message(sock):
     """Функция приема сообщения."""
     encoded_response = sock.recv(MAX_PACKAGE_SIZE)
-    json_response = encoded_response.decode(ENCODING)
-    response = json.loads(json_response)
-    if isinstance(response, dict):
-        return response
+    if isinstance(encoded_response, bytes):
+        json_response = encoded_response.decode(ENCODING)
+        response = json.loads(json_response)
+        if isinstance(response, dict):
+            return response
+        else:
+            raise GetMessageNoDictError
     else:
-        raise GetMessageNoDictError()
+        raise IncorrectDataRecievedError

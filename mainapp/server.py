@@ -4,7 +4,8 @@ from time import sleep
 
 from descriptors import Port
 from common.variables import MAX_PACKAGE_SIZE, ACTION, PRESENCE, USER, ACCOUNT_NAME, RESPONSE_200, \
-    ERROR, RESPONSE_USED_NAME, SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT
+    ERROR, SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT, RESPONSE_201
+from server_database import ServerStorage
 from metaclasses import ServerVerifier
 from common.utils import get_host_port, send_message, get_message
 from common import variables
@@ -14,6 +15,7 @@ class Server(metaclass=ServerVerifier):
     port = Port()
 
     def __init__(self):
+        self.server_storage = ServerStorage()
         self.host, self.port = get_host_port()
         self.client_sockets = []
         self.messages = []
@@ -33,8 +35,8 @@ class Server(metaclass=ServerVerifier):
                 else:
                     self.client_sockets.append(client)
                 finally:
-                    writers_list, getters_list = [], []
                     try:
+                        writers_list, getters_list = [], []
                         writers_list, getters_list, _ = select(
                             self.client_sockets,
                             self.client_sockets,
@@ -48,7 +50,8 @@ class Server(metaclass=ServerVerifier):
                             try:
                                 self.process_client_message(writer)
                             except Exception:
-                                self.client_sockets.remove(client)
+                                self.client_sockets.remove(writer)
+                                writer.close()
                     for message in self.messages:
                         try:
                             self.process_message(message, getters_list)
@@ -61,6 +64,9 @@ class Server(metaclass=ServerVerifier):
                     self.messages.clear()
 
     def process_message(self, message, getters_list):
+        """
+        Парсинг сообщения типа клиент-клиент
+        """
         if message[DESTINATION] in self.names and self.names.get(message[DESTINATION]) in getters_list:
             send_message(self.names[message[DESTINATION]], message)
         elif message[DESTINATION] in self.names and self.names.get(DESTINATION) not in getters_list:
@@ -78,36 +84,36 @@ class Server(metaclass=ServerVerifier):
         некорректно, то отправляет ответ пользователю
         """
         message = get_message(client_sock)
+        print(message)
         # Если сообщение представление, то отвечаем пользователю
         if message[ACTION] == PRESENCE:
             if message[SENDER] not in self.names.keys():
                 self.names[message[SENDER]] = client_sock
-                send_message(client_sock, RESPONSE_200)
+                ip, port = client_sock.getpeername()
+                # self.server_storage.login(message[SENDER], ip, port)
+                response = RESPONSE_200
+                response[MESSAGE_TEXT] = 'Добро пожаловать!'
+                send_message(client_sock, response)
             else:
-                send_message(client_sock, RESPONSE_USED_NAME)
-
-            return
+                send_message(client_sock, RESPONSE_201)
         # Сообщение о выходе
         elif message[ACTION] == EXIT:
-            self.names[message[SENDER]].close()
+            response = RESPONSE_200
+            response[MESSAGE_TEXT] = 'До свидания!'
+            send_message(client_sock, response)
             self.client_sockets.remove(self.names[message[SENDER]])
+            client_sock.close()
             del self.names[message[SENDER]]
-
-            return
         # Сообщение клиент-клиент
         elif (message[ACTION] == MESSAGE and
               message[SENDER] and
               message[DESTINATION] and
               message[TIME]):
             self.messages.append(message)
-
-            return
         else:
             response = RESPONSE_400
             response[MESSAGE_TEXT] = 'Некорректный запрос'
             send_message(client_sock, response)
-
-            return
 
 
 if __name__ == '__main__':

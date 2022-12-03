@@ -28,12 +28,16 @@ EXIT = 'exit'
 # ---- RESPONSES ---- #
 RESPONSE_200 = {
     RESPONSE: '200',
+    MESSAGE_TEXT: None,
+    SENDER: SERVER,
 }
 RESPONSE_400 = {
     RESPONSE: '400',
-    MESSAGE: None,
+    MESSAGE_TEXT: None,
+    SENDER: SERVER,
 }
-RESPONSE_USED_NAME = {
-    RESPONSE: '400',
-    MESSAGE: 'Такое имя уже занято',
+RESPONSE_201 = {
+    RESPONSE: '201',
+    MESSAGE_TEXT: "Имя уже используется",
+    SENDER: SERVER,
 }
