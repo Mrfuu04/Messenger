@@ -63,7 +63,7 @@ class Client(metaclass=ClientVerifier):
             elif command == 'exit':
                 message = self.create_exit_message(self.username)
                 send_message(sock, message)
-                sleep(2)
+                sleep(1)
                 break
 
     def login(self, sock):

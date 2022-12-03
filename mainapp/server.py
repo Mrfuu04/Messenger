@@ -1,5 +1,6 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from select import select
+from threading import Thread
 from time import sleep
 
 from descriptors import Port
@@ -11,7 +12,9 @@ from common.utils import get_host_port, send_message, get_message
 from common import variables
 
 
-class Server(metaclass=ServerVerifier):
+class Server(
+    metaclass=ServerVerifier,
+):
     port = Port()
 
     def __init__(self):
@@ -22,6 +25,43 @@ class Server(metaclass=ServerVerifier):
         self.names = dict()
 
     def run(self):
+        frontside = Thread(
+            target=self._frontside, daemon=True,
+        )
+        backside = Thread(
+            target=self._backside, daemon=True,
+        )
+        frontside.start()
+        backside.start()
+
+        while True:
+            sleep(1)
+            if frontside.is_alive() and backside.is_alive():
+                continue
+            break
+
+    def _frontside(self):
+        """
+        Поток консольного управления.
+        """
+        print('*** Для вывода справки введите help ***')
+        while True:
+            command = input('Введите команду: ')
+            if command == 'help':
+                print(self.__print_help_message())
+            elif command == 'userlist':
+                print(self.get_userlist())
+            elif command == 'online':
+                print(self.get_online_users())
+            elif command == 'history':
+                print(self.get_loginhistory())
+            elif command == 'exit':
+                break
+
+    def _backside(self):
+        """
+        Поток обработки сообщений.
+        """
         with socket(AF_INET, SOCK_STREAM) as server_sock:
             server_sock.bind((self.host, self.port))
             server_sock.listen(variables.SERVER_MAX_LISTEN)
@@ -49,7 +89,8 @@ class Server(metaclass=ServerVerifier):
                         for writer in writers_list:
                             try:
                                 self.process_client_message(writer)
-                            except Exception:
+                            except Exception as e:
+                                print(e)
                                 self.client_sockets.remove(writer)
                                 writer.close()
                     for message in self.messages:
@@ -90,7 +131,7 @@ class Server(metaclass=ServerVerifier):
             if message[SENDER] not in self.names.keys():
                 self.names[message[SENDER]] = client_sock
                 ip, port = client_sock.getpeername()
-                # self.server_storage.login(message[SENDER], ip, port)
+                self.server_storage.login(message[SENDER], ip, port)
                 response = RESPONSE_200
                 response[MESSAGE_TEXT] = 'Добро пожаловать!'
                 send_message(client_sock, response)
@@ -101,6 +142,7 @@ class Server(metaclass=ServerVerifier):
             response = RESPONSE_200
             response[MESSAGE_TEXT] = 'До свидания!'
             send_message(client_sock, response)
+            self.server_storage.logout(message[SENDER])
             self.client_sockets.remove(self.names[message[SENDER]])
             client_sock.close()
             del self.names[message[SENDER]]
@@ -114,6 +156,43 @@ class Server(metaclass=ServerVerifier):
             response = RESPONSE_400
             response[MESSAGE_TEXT] = 'Некорректный запрос'
             send_message(client_sock, response)
+
+    def get_userlist(self):
+        users = self.server_storage.get_userlist()
+        out_msg = 'Список пользователей: \n'
+        for user in users:
+            login, date = user
+            out_msg += f'{login}, последний логин: {date.strftime("%D %T")}\n'
+
+        return out_msg
+
+    def get_online_users(self):
+        users = self.server_storage.get_online_users()
+        out_msg = 'Список пользователей онлайн: \n'
+        for user in users:
+            login, ip, date = user
+            out_msg += f'{login} {ip}, время подключения {date.strftime("%D %T")}\n'
+
+        return out_msg
+
+    def get_loginhistory(self):
+        users = self.server_storage.get_loginhistory()
+        out_msg = 'Список коннектов: \n'
+        for user in users:
+            login, ip, port, last_conn = user
+            out_msg += f'{login} {ip}:{port} {last_conn}\n'
+
+        return out_msg
+
+    def __print_help_message(self):
+        help_message = """Доступные команды: 
+        userlist - список всех пользователей
+        online - список подключённых пользователей
+        history - история подключений
+        exit - завершение работы сервера
+        help - помощь"""
+
+        return help_message
 
 
 if __name__ == '__main__':
