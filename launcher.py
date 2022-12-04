@@ -29,12 +29,13 @@ def get_subprocess(executable):
 
 
 def main():
+    # subprocess.Popen(f'{PYTHON_PATH} {BASE_PATH}/{"server/server.py"}',)
     PROCESSES = []
     args = get_args()
-    PROCESSES.append(get_subprocess('mainapp/server.py'))
+    PROCESSES.append(get_subprocess('server/server.py'))
     for i in range(args.clients):
         sleep(0.5)
-        PROCESSES.append(get_subprocess('mainapp/client.py'))
+        PROCESSES.append(get_subprocess('client/client.py'))
 
 
 if __name__ == '__main__':

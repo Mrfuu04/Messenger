@@ -4,10 +4,10 @@ from threading import Thread
 from time import sleep
 
 from descriptors import Port
-from common.variables import MAX_PACKAGE_SIZE, ACTION, PRESENCE, USER, ACCOUNT_NAME, RESPONSE_200, \
-    ERROR, SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT, RESPONSE_201
-from server_database import ServerStorage
-from metaclasses import ServerVerifier
+from common.variables import ACTION, PRESENCE, RESPONSE_200, \
+    SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT, RESPONSE_201
+from server_db.server_database import ServerStorage
+from common.metaclasses import ServerVerifier
 from common.utils import get_host_port, send_message, get_message
 from common import variables
 

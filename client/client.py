@@ -4,9 +4,9 @@ from threading import Thread
 from time import sleep, time
 
 from descriptors import Port
-from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, USER, ACCOUNT_NAME, TIME, MESSAGE, DESTINATION, \
+from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, TIME, MESSAGE, DESTINATION, \
     EXIT, SERVER, RESPONSE_201
-from metaclasses import ClientVerifier
+from common.metaclasses import ClientVerifier
 from common.utils import get_host_port, get_message, send_message
 
 

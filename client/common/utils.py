@@ -1,11 +1,7 @@
 import json
-import sys
-
-# sys.path.append('..')
-from time import sleep
 
 from .errors import SendMessageNoDictError, GetMessageNoDictError, IncorrectDataRecievedError
-from .variables import HOST, PORT, ENCODING, MAX_PACKAGE_SIZE, MESSAGE_TEXT
+from .variables import HOST, PORT, ENCODING, MAX_PACKAGE_SIZE
 
 
 def get_host_port():
