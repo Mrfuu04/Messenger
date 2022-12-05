@@ -1,3 +1,5 @@
+import configparser
+import os
 from socket import socket, AF_INET, SOCK_STREAM
 from select import select
 from threading import Thread
@@ -17,9 +19,9 @@ class Server(
 ):
     port = Port()
 
-    def __init__(self):
-        self.server_storage = ServerStorage()
-        self.host, self.port = get_host_port()
+    def __init__(self, config):
+        self.server_storage = ServerStorage(config)
+        self.host, self.port = get_host_port(config)
         self.client_sockets = []
         self.messages = []
         self.names = dict()
@@ -161,7 +163,7 @@ class Server(
         users = self.server_storage.get_userlist()
         out_msg = 'Список пользователей: \n'
         for user in users:
-            login, date = user
+            login, _, _, date = user
             out_msg += f'{login}, последний логин: {date.strftime("%D %T")}\n'
 
         return out_msg
@@ -196,5 +198,9 @@ class Server(
 
 
 if __name__ == '__main__':
-    server = Server()
+    config = configparser.ConfigParser()
+    dir_path = os.path.dirname(os.path.relpath(__file__))
+    config_file_path = os.path.join(dir_path, 'conf.ini')
+    config.read(config_file_path)
+    server = Server(config=config)
     server.run()

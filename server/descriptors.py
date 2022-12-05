@@ -3,6 +3,7 @@ class Port:
     DEFAULT_PORT = 7777
 
     def __set__(self, instance, value):
+        value = int(value)
         if value < 0 or value >= 65535:
             print(f'Недопустимое значение для порта - {value}\n'
                   f'Присваиваю стандартное значение - {self.DEFAULT_PORT}')

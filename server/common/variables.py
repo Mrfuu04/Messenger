@@ -1,12 +1,8 @@
-# ---- MAIN SETTINGS ---- #
-HOST = 'localhost'
-PORT = 8080
-ENCODING = 'utf-8'
-MAX_PACKAGE_SIZE = 1024
-
 # ---- SERVER SETTINGS ---- #
 SERVER_MAX_LISTEN = 5
 SERVER_SETTIMEOUT = 1
+MAX_PACKAGE_SIZE = 1024
+ENCODING = 'utf-8'
 
 # ---- JIM VARIABLES ---- #
 ACTION = 'action'

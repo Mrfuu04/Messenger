@@ -54,9 +54,13 @@ class ServerStorage:
             self.port = port
             self.last_conn = last_conn
 
-    def __init__(self):
+    def __init__(self, config):
+        db_name = config['SETTINGS'].get('database_file') or 'server_database'
+        db_dir = config['SETTINGS'].get('database_dir') or ''
+        if db_dir:
+            db_dir += '/'
         engine = create_engine(
-            'sqlite:///server_database.db3?check_same_thread=False',
+            f'sqlite:///{db_dir}{db_name}.db3?check_same_thread=False',
             echo=False,
             pool_recycle=7200,
         )
@@ -133,6 +137,8 @@ class ServerStorage:
         """
         users = self.session.query(
             self.Users.login,
+            self.ActiveUsers.ip,
+            self.ActiveUsers.port,
             self.Users.last_login,
         ).all()
 

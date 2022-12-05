@@ -1,11 +1,13 @@
 import json
 
 from .errors import SendMessageNoDictError, GetMessageNoDictError, IncorrectDataRecievedError
-from .variables import HOST, PORT, ENCODING, MAX_PACKAGE_SIZE
+from .variables import ENCODING, MAX_PACKAGE_SIZE
 
 
-def get_host_port():
-    return HOST, PORT
+def get_host_port(config):
+    host = config['SETTINGS'].get('default_address') or 'localhost'
+    port = config['SETTINGS'].get('default_port') or '8080'
+    return host, port
 
 
 def send_message(sock, message):
