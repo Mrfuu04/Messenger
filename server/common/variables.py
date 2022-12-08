@@ -1,8 +1,15 @@
+import os
+
 # ---- SERVER SETTINGS ---- #
 SERVER_MAX_LISTEN = 5
 SERVER_SETTIMEOUT = 1
 MAX_PACKAGE_SIZE = 1024
 ENCODING = 'utf-8'
+DB_NAME = 'server_db'
+DB_PATH = os.path.join(
+    os.sep.join(
+        os.path.abspath(
+            os.getcwd()).split(os.sep)), 'server_db')
 
 # ---- JIM VARIABLES ---- #
 ACTION = 'action'
@@ -20,6 +27,9 @@ PRESENCE = 'presence'
 RESPONSE = 'response'
 ERROR = 'error'
 EXIT = 'exit'
+CONTACTS = 'get_contacts'
+ADD_CONTACT = 'add_contact'
+DEL_CONTACT = 'del_contact'
 
 # ---- RESPONSES ---- #
 RESPONSE_200 = {

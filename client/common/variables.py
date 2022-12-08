@@ -20,6 +20,9 @@ PRESENCE = 'presence'
 RESPONSE = 'response'
 ERROR = 'error'
 EXIT = 'exit'
+CONTACTS = 'get_contacts'
+ADD_CONTACT = 'add_contact'
+DEL_CONTACT = 'del_contact'
 
 # ---- RESPONSES ---- #
 RESPONSE_200 = {
