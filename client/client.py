@@ -1,11 +1,11 @@
 import sys
 from socket import socket, AF_INET, SOCK_STREAM
-from threading import Thread
+from threading import Thread, Lock
 from time import sleep, time
 
 from descriptors import Port
 from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, TIME, MESSAGE, DESTINATION, \
-    EXIT, SERVER, RESPONSE_201
+    EXIT, SERVER, RESPONSE_201, CONTACTS, ADD_CONTACT, DEL_CONTACT
 from common.metaclasses import ClientVerifier
 from common.utils import get_host_port, get_message, send_message
 
@@ -15,6 +15,8 @@ class Client(metaclass=ClientVerifier):
 
     def __init__(self):
         self.host, self.port = get_host_port()
+        # лок для сокета
+        self.sock_lock = Lock()
 
     def run(self):
         client_sock = socket(AF_INET, SOCK_STREAM)
@@ -65,6 +67,25 @@ class Client(metaclass=ClientVerifier):
                 send_message(sock, message)
                 sleep(1)
                 break
+            elif command == 'contacts':
+                message = self.create_contacts_request(self.username)
+                with self.sock_lock:
+                    send_message(sock, message)
+            elif command == 'add_contact':
+                destination = input('Введите имя пользователя: ')
+                message = self.create_add_contact_request(
+                    self.username,
+                    destination)
+                with self.sock_lock:
+                    send_message(sock, message)
+            elif command == 'del_contact':
+                destination = input('Введите имя пользователя: ')
+                message = self.create_del_contact_request(self.username,
+                                                          destination)
+                with self.sock_lock:
+                    send_message(sock, message)
+            else:
+                print('Неопознанная команда')
 
     def login(self, sock):
         while True:
@@ -111,10 +132,54 @@ class Client(metaclass=ClientVerifier):
 
         return message
 
+    def create_contacts_request(self, username):
+        """Создает словарь запроса списка контактов"""
+        message = {
+            ACTION: CONTACTS,
+            TIME: time(),
+            SENDER: username,
+            DESTINATION: SERVER,
+        }
+
+        return message
+
+    def create_add_contact_request(self, sender, recipient):
+        """
+        Создает словарь запроса на добавление
+        пользователя в список контактов
+        """
+        message = {
+            ACTION: ADD_CONTACT,
+            TIME: time(),
+            SENDER: sender,
+            DESTINATION: SERVER,
+            MESSAGE_TEXT: recipient,
+        }
+
+        return message
+
+    def create_del_contact_request(self, username, recipient):
+        """
+        Создает словарь запроса на удаление
+        пользователя из списка контактов
+        """
+        message = {
+            ACTION: DEL_CONTACT,
+            TIME: time(),
+            SENDER: username,
+            DESTINATION: SERVER,
+            MESSAGE_TEXT: recipient,
+        }
+
+        return message
+
     def get_help_message(self):
         print(
             "help - вывод всех доступных комманд\n"
             "message - написать сообщение пользователю\n"
+            "contacts - список контактов\n"
+            "add_contact - добавить контакт\n"
+            "del_contact - удалить контакт\n"
             "exit - выйти из программы\n"
         )
 

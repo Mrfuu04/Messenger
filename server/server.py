@@ -1,13 +1,18 @@
 import configparser
 import os
+import sys
 from socket import socket, AF_INET, SOCK_STREAM
 from select import select
 from threading import Thread
 from time import sleep
 
+from PyQt5.QtWidgets import QApplication
+
 from descriptors import Port
 from common.variables import ACTION, PRESENCE, RESPONSE_200, \
-    SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT, RESPONSE_201
+    SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT, RESPONSE_201, CONTACTS, ADD_CONTACT, \
+    DEL_CONTACT
+from gui.server_gui import ServerGui
 from server_db.server_database import ServerStorage
 from common.metaclasses import ServerVerifier
 from common.utils import get_host_port, send_message, get_message
@@ -19,28 +24,52 @@ class Server(
 ):
     port = Port()
 
-    def __init__(self, config):
-        self.server_storage = ServerStorage(config)
-        self.host, self.port = get_host_port(config)
+    def __init__(self, config_file_path):
+        self.config_file_path = config_file_path
+        self.config = configparser.ConfigParser()
+        self.config.read(config_file_path)
+
+        self.server_storage = ServerStorage(self.config)
+        self.host, self.port = get_host_port(self.config)
         self.client_sockets = []
         self.messages = []
         self.names = dict()
 
     def run(self):
         frontside = Thread(
-            target=self._frontside, daemon=True,
+            target=self._frontside,
+            daemon=True,
         )
         backside = Thread(
-            target=self._backside, daemon=True,
+            target=self._backside,
+            daemon=True,
         )
-        frontside.start()
+        gui = Thread(
+            target=self._run_gui,
+            args=(self.config_file_path,),
+            daemon=True,
+        )
+        # frontside.start()
         backside.start()
+        gui.start()
 
         while True:
             sleep(1)
-            if frontside.is_alive() and backside.is_alive():
+            if backside.is_alive() and gui.is_alive():
                 continue
             break
+
+    def _run_gui(self, config_file_path):
+        """
+        Поток графического клиента для сервера.
+        """
+        server_app = QApplication(sys.argv)
+
+        server_gui = ServerGui(config_file_path, self.server_storage)
+        server_gui.set_timer(3000)
+        server_gui.show()
+
+        server_app.exec()
 
     def _frontside(self):
         """
@@ -112,6 +141,8 @@ class Server(
         """
         if message[DESTINATION] in self.names and self.names.get(message[DESTINATION]) in getters_list:
             send_message(self.names[message[DESTINATION]], message)
+            self.server_storage.update_user_msg_counts(message[SENDER],
+                                                       message[DESTINATION])
         elif message[DESTINATION] in self.names and self.names.get(DESTINATION) not in getters_list:
             raise ConnectionError
         else:
@@ -127,7 +158,7 @@ class Server(
         некорректно, то отправляет ответ пользователю
         """
         message = get_message(client_sock)
-        print(message)
+
         # Если сообщение представление, то отвечаем пользователю
         if message[ACTION] == PRESENCE:
             if message[SENDER] not in self.names.keys():
@@ -139,6 +170,7 @@ class Server(
                 send_message(client_sock, response)
             else:
                 send_message(client_sock, RESPONSE_201)
+
         # Сообщение о выходе
         elif message[ACTION] == EXIT:
             response = RESPONSE_200
@@ -148,12 +180,49 @@ class Server(
             self.client_sockets.remove(self.names[message[SENDER]])
             client_sock.close()
             del self.names[message[SENDER]]
+
         # Сообщение клиент-клиент
         elif (message[ACTION] == MESSAGE and
               message[SENDER] and
               message[DESTINATION] and
               message[TIME]):
             self.messages.append(message)
+
+        # Запрос на список контактов
+        elif message[ACTION] == CONTACTS:
+            contacts = self.server_storage.get_user_contacts(
+                message[SENDER]
+            )
+            response = RESPONSE_200
+            response[MESSAGE_TEXT] = contacts
+            send_message(client_sock, response)
+
+        # Добавление контакта
+        elif message[ACTION] == ADD_CONTACT:
+            created = self.server_storage.add_contact(
+                message[SENDER],
+                message[MESSAGE_TEXT],
+            )
+            response = RESPONSE_200
+            if created:
+                response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} добавлен'
+                send_message(client_sock, response)
+            else:
+                response[MESSAGE_TEXT] = f'Ошибка при добавлении пользователя'
+            send_message(client_sock, response)
+
+        # Удаление контакта
+        elif message[ACTION] == DEL_CONTACT:
+            deleted = self.server_storage.del_contact(
+                message[SENDER],
+                message[MESSAGE_TEXT],
+            )
+            response = RESPONSE_200
+            if deleted:
+                response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} удален'
+            else:
+                response[MESSAGE_TEXT] = f'Ошибка при удалении пользователя'
+            send_message(client_sock, response)
         else:
             response = RESPONSE_400
             response[MESSAGE_TEXT] = 'Некорректный запрос'
@@ -172,7 +241,7 @@ class Server(
         users = self.server_storage.get_online_users()
         out_msg = 'Список пользователей онлайн: \n'
         for user in users:
-            login, ip, date = user
+            login, ip, date, _ = user
             out_msg += f'{login} {ip}, время подключения {date.strftime("%D %T")}\n'
 
         return out_msg
@@ -201,6 +270,6 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     dir_path = os.path.dirname(os.path.relpath(__file__))
     config_file_path = os.path.join(dir_path, 'conf.ini')
-    config.read(config_file_path)
-    server = Server(config=config)
+    server = Server(config_file_path=config_file_path)
+    server.server_storage.get_user_contacts('test')
     server.run()
