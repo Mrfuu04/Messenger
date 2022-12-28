@@ -3,11 +3,16 @@ from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread, Lock
 from time import sleep, time
 
+from PyQt5.QtWidgets import QApplication, QMessageBox
+
+from common.transport import Transport
 from descriptors import Port
 from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, TIME, MESSAGE, DESTINATION, \
     EXIT, SERVER, RESPONSE_201, CONTACTS, ADD_CONTACT, DEL_CONTACT
 from common.metaclasses import ClientVerifier
-from common.utils import get_host_port, get_message, send_message
+from common.utils import get_host_port, get_message, send_message, MessageCreator
+from gui.auth import ClientAuth
+from gui.main_form import ClientGui
 
 
 class Client(metaclass=ClientVerifier):
@@ -15,8 +20,58 @@ class Client(metaclass=ClientVerifier):
 
     def __init__(self):
         self.host, self.port = get_host_port()
+        self.message_creator = MessageCreator()
         # лок для сокета
         self.sock_lock = Lock()
+
+    def run_gui(self):
+        # Первичное окно авторизации
+        self.auth_app = QApplication(sys.argv)
+        self.auth_form = ClientAuth()
+        self.auth_form.confirmBtn.clicked.connect(self._auth)
+        self.auth_form.show()
+        self.auth_app.exec_()
+
+        # Основное окно клиента
+        self.transport = Transport(
+            self.client_sock,
+            self.username,
+        )
+        self.transport.daemon = True
+        self.transport.start()
+
+        self.client_app = QApplication(sys.argv)
+        self.client_gui = ClientGui(self.transport)
+        self.client_gui.make_connection(self.transport)
+        self.client_gui.show()
+        sys.exit(self.client_app.exec_())
+
+        self.transport.join()
+
+    def _auth(self):
+        self.client_sock = socket(AF_INET, SOCK_STREAM)
+        try:
+            self.client_sock.connect((self.host, self.port))
+        except ConnectionRefusedError:
+            QMessageBox.question(
+                self.auth_form,
+                'Внимание',
+                'Связь с сервером не установлена',
+                QMessageBox.Ok,
+            )
+            sys.exit()
+        except OSError:
+            pass
+        self.username = self.auth_form.username.text()
+        presence = self.message_creator.create_presence(self.username)
+        send_message(self.client_sock, presence)
+        presence_response = get_message(self.client_sock)
+        answer_message = QMessageBox()
+        if presence_response == RESPONSE_201:
+            answer_message.question(self.auth_form, 'Внимание', f'Имя {self.username} уже занято', QMessageBox.Ok)
+        else:
+            answer_message.question(self.auth_form, 'Авторизация', 'Добро пожаловать', QMessageBox.Ok)
+            self.auth_form.close()
 
     def run(self):
         client_sock = socket(AF_INET, SOCK_STREAM)
@@ -60,28 +115,28 @@ class Client(metaclass=ClientVerifier):
                 self.get_help_message()
             elif command == 'message':
                 destination = input('Введите имя получателя: ')
-                message = self.create_message(self.username, destination)
+                message = self.message_creator.create_message(self.username, destination)
                 send_message(sock, message)
             elif command == 'exit':
-                message = self.create_exit_message(self.username)
+                message = self.message_creator.create_exit_message(self.username)
                 send_message(sock, message)
                 sleep(1)
                 break
             elif command == 'contacts':
-                message = self.create_contacts_request(self.username)
+                message = self.message_creator.create_contacts_request(self.username)
                 with self.sock_lock:
                     send_message(sock, message)
             elif command == 'add_contact':
                 destination = input('Введите имя пользователя: ')
-                message = self.create_add_contact_request(
+                message = self.message_creator.create_add_contact_request(
                     self.username,
                     destination)
                 with self.sock_lock:
                     send_message(sock, message)
             elif command == 'del_contact':
                 destination = input('Введите имя пользователя: ')
-                message = self.create_del_contact_request(self.username,
-                                                          destination)
+                message = self.message_creator.create_del_contact_request(self.username,
+                                                                          destination)
                 with self.sock_lock:
                     send_message(sock, message)
             else:
@@ -90,7 +145,7 @@ class Client(metaclass=ClientVerifier):
     def login(self, sock):
         while True:
             self.username = input('Введите имя пользователя: ')
-            presence = self.create_presence(self.username)
+            presence = self.message_creator.create_presence(self.username)
             send_message(sock, presence)
             presence_response = get_message(sock)
             if presence_response == RESPONSE_201:
@@ -98,80 +153,6 @@ class Client(metaclass=ClientVerifier):
             else:
                 print(presence_response[MESSAGE_TEXT])
                 break
-
-    def create_presence(self, username):
-        """Создает словарь представение клиента"""
-        message = {
-            ACTION: PRESENCE,
-            TIME: time(),
-            SENDER: username,
-            DESTINATION: SERVER,
-        }
-        return message
-
-    def create_message(self, sender, destination):
-        """Создает словарь сообщение клиент-клиент"""
-        msg_text = input('Введите сообщение: ')
-        message = {
-            ACTION: MESSAGE,
-            TIME: time(),
-            SENDER: sender,
-            DESTINATION: destination,
-            MESSAGE_TEXT: msg_text,
-        }
-        return message
-
-    def create_exit_message(self, username):
-        """Создает словарь выхода из мессенджеа"""
-        message = {
-            ACTION: EXIT,
-            TIME: time(),
-            SENDER: username,
-            DESTINATION: SERVER,
-        }
-
-        return message
-
-    def create_contacts_request(self, username):
-        """Создает словарь запроса списка контактов"""
-        message = {
-            ACTION: CONTACTS,
-            TIME: time(),
-            SENDER: username,
-            DESTINATION: SERVER,
-        }
-
-        return message
-
-    def create_add_contact_request(self, sender, recipient):
-        """
-        Создает словарь запроса на добавление
-        пользователя в список контактов
-        """
-        message = {
-            ACTION: ADD_CONTACT,
-            TIME: time(),
-            SENDER: sender,
-            DESTINATION: SERVER,
-            MESSAGE_TEXT: recipient,
-        }
-
-        return message
-
-    def create_del_contact_request(self, username, recipient):
-        """
-        Создает словарь запроса на удаление
-        пользователя из списка контактов
-        """
-        message = {
-            ACTION: DEL_CONTACT,
-            TIME: time(),
-            SENDER: username,
-            DESTINATION: SERVER,
-            MESSAGE_TEXT: recipient,
-        }
-
-        return message
 
     def get_help_message(self):
         print(
@@ -186,4 +167,4 @@ class Client(metaclass=ClientVerifier):
 
 if __name__ == '__main__':
     client = Client()
-    client.run()
+    client.run_gui()

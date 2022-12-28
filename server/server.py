@@ -57,7 +57,7 @@ class Server(
             sleep(1)
             if backside.is_alive() and gui.is_alive():
                 continue
-            break
+            sys.exit()
 
     def _run_gui(self, config_file_path):
         """
@@ -69,7 +69,7 @@ class Server(
         server_gui.set_timer(3000)
         server_gui.show()
 
-        server_app.exec()
+        sys.exit(server_app.exec())
 
     def _frontside(self):
         """
@@ -87,7 +87,7 @@ class Server(
             elif command == 'history':
                 print(self.get_loginhistory())
             elif command == 'exit':
-                break
+                sys.exit()
 
     def _backside(self):
         """
@@ -121,18 +121,16 @@ class Server(
                             try:
                                 self.process_client_message(writer)
                             except Exception as e:
-                                print(e)
-                                self.client_sockets.remove(writer)
-                                writer.close()
+                                # Отрефакторить
+                                connection_lost_username = list(
+                                    self.names.keys())[list(self.names.values()).index(writer)]
+                                self._end_connection_with_client(connection_lost_username)
                     for message in self.messages:
                         try:
                             self.process_message(message, getters_list)
                         except ConnectionError:
-                            try:
-                                del self.names[message[DESTINATION]]
-                            except KeyError:
-                                pass
-                            self.client_sockets.remove(self.names[message[DESTINATION]])
+                            self._end_connection_with_client(message[DESTINATION])
+
                     self.messages.clear()
 
     def process_message(self, message, getters_list):
@@ -176,10 +174,7 @@ class Server(
             response = RESPONSE_200
             response[MESSAGE_TEXT] = 'До свидания!'
             send_message(client_sock, response)
-            self.server_storage.logout(message[SENDER])
-            self.client_sockets.remove(self.names[message[SENDER]])
-            client_sock.close()
-            del self.names[message[SENDER]]
+            self._end_connection_with_client(message[SENDER])
 
         # Сообщение клиент-клиент
         elif (message[ACTION] == MESSAGE and
@@ -206,7 +201,6 @@ class Server(
             response = RESPONSE_200
             if created:
                 response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} добавлен'
-                send_message(client_sock, response)
             else:
                 response[MESSAGE_TEXT] = f'Ошибка при добавлении пользователя'
             send_message(client_sock, response)
@@ -223,6 +217,7 @@ class Server(
             else:
                 response[MESSAGE_TEXT] = f'Ошибка при удалении пользователя'
             send_message(client_sock, response)
+
         else:
             response = RESPONSE_400
             response[MESSAGE_TEXT] = 'Некорректный запрос'
@@ -254,6 +249,18 @@ class Server(
             out_msg += f'{login} {ip}:{port} {last_conn}\n'
 
         return out_msg
+
+    def _end_connection_with_client(self, username):
+        """
+        Метод отключения клиента от сервера
+        """
+        self.server_storage.logout(username)
+        self.client_sockets.remove(self.names[username])
+        self.names.get(username).close()
+        try:
+            del self.names[username]
+        except KeyError:
+            pass
 
     def __print_help_message(self):
         help_message = """Доступные команды: 

@@ -6,10 +6,7 @@ SERVER_SETTIMEOUT = 1
 MAX_PACKAGE_SIZE = 1024
 ENCODING = 'utf-8'
 DB_NAME = 'server_db'
-DB_PATH = os.path.join(
-    os.sep.join(
-        os.path.abspath(
-            os.getcwd()).split(os.sep)), 'server_db')
+DB_PATH = '' # not used
 
 # ---- JIM VARIABLES ---- #
 ACTION = 'action'

@@ -98,7 +98,7 @@ class ServerStorage:
         if db_dir:
             db_dir += '/'
         else:
-            db_dir = DB_PATH
+            db_dir = os.path.dirname(__file__)
         db_path = os.path.join(db_dir, db_name)
         engine = create_engine(
             f'sqlite:///{db_path}.db3?check_same_thread=False',
@@ -247,7 +247,6 @@ class ServerStorage:
         recipient_row.accept += 1
 
         self.session.commit()
-
 
     def get_user_msg_counts(self):
         """
