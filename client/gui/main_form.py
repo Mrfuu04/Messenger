@@ -147,6 +147,12 @@ class ClientGui(QMainWindow, MAIN_FORM):
             self.message_show.Ok,
         )
         self.update_contact_list()
+        if self.chat_with == delete_contact_name:
+            self.chatWithLabel.setText(f'Чат с:  <>')
+            self.sendBtn.setDisabled(True)
+            self.clearBtn.setDisabled(True)
+            self.messageInput.setDisabled(True)
+            self.messages_history_model.clear()
 
     def __select_dialog_slot(self):
         if self.contacts.currentIndex().isValid():

@@ -6,7 +6,8 @@ SERVER_SETTIMEOUT = 1
 MAX_PACKAGE_SIZE = 1024
 ENCODING = 'utf-8'
 DB_NAME = 'server_db'
-DB_PATH = '' # not used
+DB_PATH = ''  # not used
+NICKNAME_IN_USE = -1
 
 # ---- JIM VARIABLES ---- #
 ACTION = 'action'
@@ -16,6 +17,7 @@ SENDER = 'from'
 DESTINATION = 'to'
 MESSAGE = 'msg'
 MESSAGE_TEXT = 'msg_text'
+REGISTER = 'register'
 
 # ---- JIM+ VARIABLES ---- #
 SERVER = 'server'
@@ -42,5 +44,10 @@ RESPONSE_400 = {
 RESPONSE_201 = {
     RESPONSE: '201',
     MESSAGE_TEXT: "Имя уже используется",
+    SENDER: SERVER,
+}
+RESPONSE_401 = {
+    RESPONSE: '401',
+    MESSAGE_TEXT: "Неверные имя пользователя или пароль",
     SENDER: SERVER,
 }

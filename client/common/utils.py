@@ -1,9 +1,12 @@
 import json
 from time import time
 
-from .errors import SendMessageNoDictError, GetMessageNoDictError, IncorrectDataRecievedError
-from .variables import HOST, PORT, ENCODING, MAX_PACKAGE_SIZE, ACTION, PRESENCE, TIME, SENDER, DESTINATION, SERVER, \
-    MESSAGE, MESSAGE_TEXT, CONTACTS, EXIT, ADD_CONTACT, DEL_CONTACT
+from .errors import (GetMessageNoDictError, IncorrectDataRecievedError,
+                     SendMessageNoDictError)
+from .variables import (ACTION, ADD_CONTACT, CONTACTS, DEL_CONTACT,
+                        DESTINATION, ENCODING, EXIT, HOST, MAX_PACKAGE_SIZE,
+                        MESSAGE, MESSAGE_TEXT, PORT, PRESENCE, REGISTER,
+                        SENDER, SERVER, TIME)
 
 
 def get_host_port():
@@ -54,10 +57,10 @@ class MessageCreator:
 
         return message
 
-    def create_presence(self, username):
+    def create_presence(self, username, password):
         """Создает словарь представение клиента"""
         message = self.common_message(
-            action=PRESENCE, sender=username, destination=SERVER)
+            action=PRESENCE, sender=username, destination=SERVER, message_text=password)
 
         return message
 
@@ -105,6 +108,17 @@ class MessageCreator:
         """
         message = self.common_message(
             action=DEL_CONTACT, sender=username, destination=SERVER, message_text=recipient
+        )
+
+        return message
+
+    def create_register_message(self, username, password):
+        """
+        Создает словарь запроса на регистрацию
+        пользователя
+        """
+        message = self.common_message(
+            action=REGISTER, sender=username, destination=SERVER, message_text=password
         )
 
         return message

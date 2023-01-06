@@ -6,7 +6,7 @@ sys.path.append('..')
 from sqlalchemy import Column, Integer, String, create_engine, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
-from common.variables import DB_NAME, DB_PATH
+from common.variables import DB_NAME, DB_PATH, NICKNAME_IN_USE
 
 
 class ServerStorage:
@@ -22,10 +22,12 @@ class ServerStorage:
         __tablename__ = 'users'
         id = Column(Integer, primary_key=True)
         login = Column(String, unique=True)
-        last_login = Column(DateTime)
+        password = Column(String)
+        last_login = Column(DateTime, nullable=True, default=None)
 
-        def __init__(self, login, last_login):
+        def __init__(self, login, password, last_login=None):
             self.login = login
+            self.password = password
             self.last_login = last_login
 
         def __repr__(self):
@@ -112,6 +114,21 @@ class ServerStorage:
         # При первом подключении очищаем активных клиентов
         self.session.query(self.ActiveUsers).delete()
         self.session.commit()
+
+    def authenticate(self, username, password):
+        """
+        Аутентификация пользователя.
+        Если пройдена возвращает True, иначе False
+        """
+        exists = self.session.query(
+            self.Users,
+        ).filter_by(
+            login=username,
+            password=password,
+        ).all()
+        if exists:
+            return True
+        return False
 
     def login(self, username, ip, port):
         """
@@ -352,3 +369,25 @@ class ServerStorage:
 
                 return True
         return False
+    
+    def register_user(self, username, password):
+        """
+        Регистрация пользователя.
+        В случае, если ник занят возвращает -1
+        """
+        exists = self.session.query(
+            self.Users,
+        ).filter_by(
+            login=username,
+        ).all()
+        if exists:
+            return NICKNAME_IN_USE
+        else:
+            new_user = self.Users(
+                login=username,
+                password=password,
+            )
+            self.session.add(new_user)
+            self.session.commit()
+
+            return new_user

@@ -1,4 +1,5 @@
 import sys
+from hashlib import sha256
 from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread, Lock
 from time import sleep, time
@@ -8,7 +9,7 @@ from PyQt5.QtWidgets import QApplication, QMessageBox
 from common.transport import Transport
 from descriptors import Port
 from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, TIME, MESSAGE, DESTINATION, \
-    EXIT, SERVER, RESPONSE_201, CONTACTS, ADD_CONTACT, DEL_CONTACT
+    EXIT, SERVER, RESPONSE_201, CONTACTS, ADD_CONTACT, DEL_CONTACT, RESPONSE_401, RESPONSE_200, RESPONSE
 from common.metaclasses import ClientVerifier
 from common.utils import get_host_port, get_message, send_message, MessageCreator
 from gui.auth import ClientAuth
@@ -49,6 +50,15 @@ class Client(metaclass=ClientVerifier):
         self.transport.join()
 
     def _auth(self):
+        self.username = self.auth_form.username.text()
+        password = self.auth_form.password.text().encode('utf-8')
+        if not self.username or not password:
+            return QMessageBox.question(
+                self.auth_form,
+                'Внимание',
+                'Все поля обязательны',
+                QMessageBox.Ok,
+            )
         self.client_sock = socket(AF_INET, SOCK_STREAM)
         try:
             self.client_sock.connect((self.host, self.port))
@@ -62,16 +72,30 @@ class Client(metaclass=ClientVerifier):
             sys.exit()
         except OSError:
             pass
-        self.username = self.auth_form.username.text()
-        presence = self.message_creator.create_presence(self.username)
+
+        password_hash = sha256(password).hexdigest()
+        presence = self.message_creator.create_presence(
+            self.username,
+            password_hash
+        )
         send_message(self.client_sock, presence)
         presence_response = get_message(self.client_sock)
         answer_message = QMessageBox()
-        if presence_response == RESPONSE_201:
-            answer_message.question(self.auth_form, 'Внимание', f'Имя {self.username} уже занято', QMessageBox.Ok)
-        else:
-            answer_message.question(self.auth_form, 'Авторизация', 'Добро пожаловать', QMessageBox.Ok)
+        if presence_response[RESPONSE] == RESPONSE_200[RESPONSE]:
+            answer_message.question(
+                self.auth_form,
+                'Авторизация',
+                'Добро пожаловать',
+                QMessageBox.Ok,
+            )
             self.auth_form.close()
+        else:
+            answer_message.question(
+                self.auth_form,
+                'Внимание',
+                presence_response[MESSAGE_TEXT],
+                QMessageBox.Ok,
+            )
 
     def run(self):
         client_sock = socket(AF_INET, SOCK_STREAM)
@@ -145,7 +169,12 @@ class Client(metaclass=ClientVerifier):
     def login(self, sock):
         while True:
             self.username = input('Введите имя пользователя: ')
-            presence = self.message_creator.create_presence(self.username)
+            password = input('Введите пароль: ').encode('utf-8')
+            password_hash = sha256(password).hexdigest()
+            presence = self.message_creator.create_presence(
+                self.username,
+                password_hash,
+            )
             send_message(sock, presence)
             presence_response = get_message(sock)
             if presence_response == RESPONSE_201:

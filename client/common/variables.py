@@ -23,6 +23,7 @@ EXIT = 'exit'
 CONTACTS = 'get_contacts'
 ADD_CONTACT = 'add_contact'
 DEL_CONTACT = 'del_contact'
+REGISTER = 'register'
 
 # ---- RESPONSES ---- #
 RESPONSE_200 = {
@@ -38,5 +39,10 @@ RESPONSE_400 = {
 RESPONSE_201 = {
     RESPONSE: '201',
     MESSAGE_TEXT: "Имя уже используется",
+    SENDER: SERVER,
+}
+RESPONSE_401 = {
+    RESPONSE: '401',
+    MESSAGE_TEXT: "Неверные имя пользователя или пароль",
     SENDER: SERVER,
 }
