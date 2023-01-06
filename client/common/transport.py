@@ -1,17 +1,27 @@
 import json
+import sys
 import threading
 import time
-import sys
-from datetime import datetime
 
 sys.path.append('..')
-from PyQt5.QtCore import QObject, pyqtSignal
-
-from common.utils import MessageCreator, send_message, get_message
-from common.variables import SENDER, DESTINATION, MESSAGE_TEXT, RESPONSE, RESPONSE_200, SERVER
+from common.utils import (
+    MessageCreator,
+    get_message,
+    send_message,
+)
+from common.variables import (
+    DESTINATION,
+    MESSAGE_TEXT,
+    RESPONSE,
+    RESPONSE_200, 
+    SENDER,
+    SERVER,
+)
 from db.client_db import ClientStorage
-
-socket_lock = threading.Lock()
+from PyQt5.QtCore import (
+    QObject, 
+    pyqtSignal,
+)
 
 
 class Transport(threading.Thread, QObject):
@@ -22,6 +32,7 @@ class Transport(threading.Thread, QObject):
         threading.Thread.__init__(self)
         QObject.__init__(self)
         self.running = True
+        self.socket_lock = threading.Lock()
 
         self.client_storage = ClientStorage(username)
         self.message_creator = MessageCreator()
@@ -30,17 +41,17 @@ class Transport(threading.Thread, QObject):
 
     def get_contact_list(self):
         """Запрос на получение списка контактов"""
-        with socket_lock:
+        with self.socket_lock:
             message = self.message_creator.create_contacts_request(self.username)
             send_message(self.client_sock, message)
             response = get_message(self.client_sock)
-            if response[RESPONSE] != RESPONSE_200[RESPONSE]:
+            if response[RESPONSE] != RESPONSE_200:
                 return None
             return response
 
     def add_contact(self, recipient):
         """Запрос на добавление контакта"""
-        with socket_lock:
+        with self.socket_lock:
             message = self.message_creator.create_add_contact_request(
                 self.username,
                 recipient,
@@ -51,7 +62,7 @@ class Transport(threading.Thread, QObject):
             return response[MESSAGE_TEXT]
 
     def del_contact(self, recipient):
-        with socket_lock:
+        with self.socket_lock:
             message = self.message_creator.create_del_contact_request(
                 self.username,
                 recipient,
@@ -63,7 +74,7 @@ class Transport(threading.Thread, QObject):
 
     def send_message(self, recipient, msg_text):
         """Отправка сообщения"""
-        with socket_lock:
+        with self.socket_lock:
             message = self.message_creator.create_message(
                 self.username,
                 recipient,
@@ -80,7 +91,7 @@ class Transport(threading.Thread, QObject):
 
     def send_exit_message(self):
         """Отправка сообщения о выходе"""
-        with socket_lock:
+        with self.socket_lock:
             message = self.message_creator.create_exit_message(self.username)
             send_message(self.client_sock, message)
 
@@ -110,7 +121,7 @@ class Transport(threading.Thread, QObject):
             # если не сделать тут задержку, то отправка может
             # достаточно долго ждать освобождения сокета.
             time.sleep(1)
-            with socket_lock:
+            with self.socket_lock:
                 try:
                     self.client_sock.settimeout(0.5)
                     message = get_message(self.client_sock)

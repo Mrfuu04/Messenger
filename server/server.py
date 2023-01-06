@@ -1,22 +1,45 @@
 import configparser
 import os
 import sys
-from socket import socket, AF_INET, SOCK_STREAM
 from select import select
+from socket import (
+    AF_INET,
+    SOCK_STREAM, 
+    socket,
+)
 from threading import Thread
 from time import sleep
 
-from PyQt5.QtWidgets import QApplication
-
-from descriptors import Port
-from common.variables import ACTION, PRESENCE, RESPONSE_200, \
-    SENDER, EXIT, MESSAGE, RESPONSE_400, DESTINATION, TIME, MESSAGE_TEXT, RESPONSE_201, CONTACTS, ADD_CONTACT, \
-    DEL_CONTACT, REGISTER, NICKNAME_IN_USE, RESPONSE_401
-from gui.server_gui import ServerGui
-from server_db.server_database import ServerStorage
-from common.metaclasses import ServerVerifier
-from common.utils import get_host_port, send_message, get_message
 from common import variables
+from common.metaclasses import ServerVerifier
+from common.utils import (
+    get_host_port,
+    get_message,
+    send_message,
+)
+from common.variables import (
+    ACTION,
+    ADD_CONTACT,
+    CONTACTS,
+    DEL_CONTACT,
+    DESTINATION,
+    EXIT, 
+    MESSAGE,
+    MESSAGE_TEXT,
+    NICKNAME_IN_USE,
+    PRESENCE, 
+    REGISTER,
+    RESPONSE_200,
+    RESPONSE_201,
+    RESPONSE_400,
+    RESPONSE_401,
+    SENDER, 
+    TIME,
+)
+from descriptors import Port
+from gui.server_gui import ServerGui
+from PyQt5.QtWidgets import QApplication
+from server_db.server_database import ServerStorage
 
 
 class Server(
@@ -177,7 +200,6 @@ class Server(
                     send_message(client_sock, response)
                 else:
                     response = RESPONSE_401
-                    response[MESSAGE_TEXT] = 'Логин или пароль неверные'
                     send_message(client_sock, response)
                     self.client_sockets.remove(client_sock)
                     client_sock.close()

@@ -1,7 +1,14 @@
 import json
 
-from .errors import SendMessageNoDictError, GetMessageNoDictError, IncorrectDataRecievedError
-from .variables import ENCODING, MAX_PACKAGE_SIZE
+from .errors import (
+    GetMessageNoDictError, 
+    IncorrectDataRecievedError,
+    SendMessageNoDictError,
+)
+from .variables import (
+    ENCODING, 
+    MAX_PACKAGE_SIZE,
+)
 
 
 def get_host_port(config):

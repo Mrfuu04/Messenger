@@ -2,13 +2,23 @@ import os
 import sys
 from time import sleep
 
-from PyQt5 import uic
-from PyQt5.QtCore import pyqtSlot, Qt
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QBrush, QColor
-from PyQt5.QtWidgets import QMainWindow, QMessageBox
-from PyQt5.uic.properties import QtCore
-
 from gui.add_contact import AddForm
+from PyQt5 import uic
+from PyQt5.QtCore import (
+    Qt, 
+    pyqtSlot,
+)
+from PyQt5.QtGui import (
+    QBrush,
+    QColor,
+    QStandardItem,
+    QStandardItemModel,
+)
+from PyQt5.QtWidgets import (
+    QMainWindow, 
+    QMessageBox,
+)
+from PyQt5.uic.properties import QtCore
 
 MAIN_FORM, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'main_form.ui'))
 
@@ -29,6 +39,7 @@ class ClientGui(QMainWindow, MAIN_FORM):
         self.initUi()
         self.message_show = QMessageBox()
 
+        self.setWindowTitle(f'Welcome, {transport.username}!')
         self.update_contact_list()
 
     def initUi(self):

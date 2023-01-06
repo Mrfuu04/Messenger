@@ -1,19 +1,41 @@
 import sys
 from hashlib import sha256
-from socket import socket, AF_INET, SOCK_STREAM
-from threading import Thread, Lock
-from time import sleep, time
+from socket import (
+    AF_INET, 
+    SOCK_STREAM, 
+    socket,
+)
+from threading import (
+    Lock,
+    Thread,
+)
+from time import (
+    sleep,
+    time,
+)
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
-
-from common.transport import Transport
-from descriptors import Port
-from common.variables import SENDER, MESSAGE_TEXT, ACTION, PRESENCE, TIME, MESSAGE, DESTINATION, \
-    EXIT, SERVER, RESPONSE_201, CONTACTS, ADD_CONTACT, DEL_CONTACT, RESPONSE_401, RESPONSE_200, RESPONSE
 from common.metaclasses import ClientVerifier
-from common.utils import get_host_port, get_message, send_message, MessageCreator
+from common.transport import Transport
+from common.utils import (
+    MessageCreator, 
+    get_host_port, 
+    get_message,
+    send_message,
+)
+from common.variables import (
+    MESSAGE_TEXT,
+    RESPONSE,
+    RESPONSE_200,
+    RESPONSE_201, 
+    SENDER,
+)
+from descriptors import Port
 from gui.auth import ClientAuth
 from gui.main_form import ClientGui
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMessageBox,
+)
 
 
 class Client(metaclass=ClientVerifier):
@@ -26,7 +48,10 @@ class Client(metaclass=ClientVerifier):
         self.sock_lock = Lock()
 
     def run_gui(self):
-        # Первичное окно авторизации
+        """
+        Метод запуска клиентского приложения с ГУИ
+        """
+        # Первичное окно авторизации и регистрации
         self.auth_app = QApplication(sys.argv)
         self.auth_form = ClientAuth()
         self.auth_form.confirmBtn.clicked.connect(self._auth)
@@ -81,13 +106,14 @@ class Client(metaclass=ClientVerifier):
         send_message(self.client_sock, presence)
         presence_response = get_message(self.client_sock)
         answer_message = QMessageBox()
-        if presence_response[RESPONSE] == RESPONSE_200[RESPONSE]:
+        if presence_response[RESPONSE] == RESPONSE_200:
             answer_message.question(
                 self.auth_form,
                 'Авторизация',
                 'Добро пожаловать',
                 QMessageBox.Ok,
             )
+            self.auth_form.good_exit = True
             self.auth_form.close()
         else:
             answer_message.question(
@@ -98,6 +124,9 @@ class Client(metaclass=ClientVerifier):
             )
 
     def run(self):
+        """
+        Запуск клиентского приложение в консольном формате
+        """
         client_sock = socket(AF_INET, SOCK_STREAM)
         try:
             client_sock.connect((self.host, self.port))
@@ -177,7 +206,7 @@ class Client(metaclass=ClientVerifier):
             )
             send_message(sock, presence)
             presence_response = get_message(sock)
-            if presence_response == RESPONSE_201:
+            if presence_response[RESPONSE] == RESPONSE_201:
                 print(presence_response[MESSAGE_TEXT])
             else:
                 print(presence_response[MESSAGE_TEXT])

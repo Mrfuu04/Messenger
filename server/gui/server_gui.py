@@ -3,14 +3,23 @@ import os
 import sys
 from datetime import datetime
 
-from PyQt5.QtCore import QTimer
 from PyQt5 import uic
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QMainWindow, QApplication
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import (
+    QStandardItem, 
+    QStandardItemModel,
+)
+from PyQt5.QtWidgets import (
+    QApplication, 
+    QMainWindow,
+)
 
 sys.path.append('..')
 
-from common.variables import DB_NAME, DB_PATH
+from common.variables import (
+    DB_NAME,
+    DB_PATH,
+)
 from server_db.server_database import ServerStorage
 
 MAIN_FORM, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'form.ui'))
