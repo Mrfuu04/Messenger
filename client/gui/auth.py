@@ -1,11 +1,10 @@
 import os
 import sys
 
-from gui.register import ClientRegisterUI
+from .register import ClientRegisterUI
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
     QDialog, 
-    qApp,
 )
 
 MAIN_FORM, _ = uic.loadUiType(os.path.join(

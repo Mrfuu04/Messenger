@@ -1,8 +1,8 @@
 import sys
 from hashlib import sha256
 from socket import (
-    AF_INET, 
-    SOCK_STREAM, 
+    AF_INET,
+    SOCK_STREAM,
     socket,
 )
 from threading import (
@@ -13,12 +13,14 @@ from time import (
     sleep,
     time,
 )
+from logging import getLogger
+import logs.log_config
 
 from common.metaclasses import ClientVerifier
 from common.transport import Transport
 from common.utils import (
-    MessageCreator, 
-    get_host_port, 
+    MessageCreator,
+    get_host_port,
     get_message,
     send_message,
 )
@@ -26,7 +28,7 @@ from common.variables import (
     MESSAGE_TEXT,
     RESPONSE,
     RESPONSE_200,
-    RESPONSE_201, 
+    RESPONSE_201,
     SENDER,
 )
 from descriptors import Port
@@ -44,6 +46,7 @@ class Client(metaclass=ClientVerifier):
     def __init__(self):
         self.host, self.port = get_host_port()
         self.message_creator = MessageCreator()
+        self.logger = getLogger('client')
         # лок для сокета
         self.sock_lock = Lock()
 
@@ -72,6 +75,7 @@ class Client(metaclass=ClientVerifier):
         self.client_gui.show()
         sys.exit(self.client_app.exec_())
 
+        self.logger.info('Завершена работа клиента')
         self.transport.join()
 
     def _auth(self):
@@ -94,6 +98,8 @@ class Client(metaclass=ClientVerifier):
                 'Связь с сервером не установлена',
                 QMessageBox.Ok,
             )
+            self.logger.warning(
+                f'Связь с сервером {self.host, self.port} не установлена')
             sys.exit()
         except OSError:
             pass
@@ -110,9 +116,11 @@ class Client(metaclass=ClientVerifier):
             answer_message.question(
                 self.auth_form,
                 'Авторизация',
-                'Добро пожаловать',
+                presence_response[MESSAGE_TEXT],
                 QMessageBox.Ok,
             )
+            self.logger.info(
+                f'Успешное подключение к серверу {self.host, self.port}')
             self.auth_form.good_exit = True
             self.auth_form.close()
         else:
@@ -122,6 +130,9 @@ class Client(metaclass=ClientVerifier):
                 presence_response[MESSAGE_TEXT],
                 QMessageBox.Ok,
             )
+            self.logger.info(
+                f'Авторизация не удалась.'
+                f'Ответ сервера: {presence_response[MESSAGE_TEXT]}')
 
     def run(self):
         """
@@ -221,7 +232,6 @@ class Client(metaclass=ClientVerifier):
             "del_contact - удалить контакт\n"
             "exit - выйти из программы\n"
         )
-
 
 if __name__ == '__main__':
     client = Client()

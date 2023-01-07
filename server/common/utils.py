@@ -6,7 +6,7 @@ from .errors import (
     SendMessageNoDictError,
 )
 from .variables import (
-    ENCODING, 
+    ENCODING,
     MAX_PACKAGE_SIZE,
 )
 
@@ -31,7 +31,10 @@ def get_message(sock):
     encoded_response = sock.recv(MAX_PACKAGE_SIZE)
     if isinstance(encoded_response, bytes):
         json_response = encoded_response.decode(ENCODING)
-        response = json.loads(json_response)
+        if json_response.count('}') > 1:
+            return None
+        else:
+            response = json.loads(json_response)
         if isinstance(response, dict):
             return response
         else:

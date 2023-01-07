@@ -4,6 +4,8 @@ import threading
 import time
 
 sys.path.append('..')
+from logging import getLogger
+import logs.log_config
 from common.utils import (
     MessageCreator,
     get_message,
@@ -34,6 +36,7 @@ class Transport(threading.Thread, QObject):
         self.running = True
         self.socket_lock = threading.Lock()
 
+        self.logger = getLogger('client')
         self.client_storage = ClientStorage(username)
         self.message_creator = MessageCreator()
         self.client_sock = client_sock
@@ -94,6 +97,9 @@ class Transport(threading.Thread, QObject):
         with self.socket_lock:
             message = self.message_creator.create_exit_message(self.username)
             send_message(self.client_sock, message)
+            self.logger.info(
+                'Самостоятельное отключение клиента от сервера'
+            )
 
     def get_chat_history(self, chat_with):
         """Запрос на получение истории сообщений"""
@@ -127,6 +133,9 @@ class Transport(threading.Thread, QObject):
                     message = get_message(self.client_sock)
                 except OSError as err:
                     if err.errno:
+                        self.logger.warning(
+                            'Потеряно соединение с сервером'
+                        )
                         self.running = False
                         self.connection_lost.emit()
                 # Проблемы с соединением
@@ -137,6 +146,9 @@ class Transport(threading.Thread, QObject):
                         json.JSONDecodeError,
                         TypeError,
                 ):
+                    self.logger.warning(
+                        'Потеряно соединение с сервером'
+                    )
                     self.running = False
                     self.connection_lost.emit()
                 # Если сообщение получено, то вызываем функцию обработчик:

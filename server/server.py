@@ -9,6 +9,8 @@ from socket import (
 )
 from threading import Thread
 from time import sleep
+from logging import getLogger
+import logs.log_config
 
 from common import variables
 from common.metaclasses import ServerVerifier
@@ -52,6 +54,7 @@ class Server(
         self.config = configparser.ConfigParser()
         self.config.read(config_file_path)
 
+        self.logger = getLogger('server')
         self.server_storage = ServerStorage(self.config)
         self.host, self.port = get_host_port(self.config)
         self.client_sockets = []
@@ -124,6 +127,9 @@ class Server(
             while True:
                 try:
                     client, addr = server_sock.accept()
+                    self.logger.info(
+                        f'Подключен пользователь {client} {addr}'
+                    )
                 except TimeoutError:
                     pass
                 else:
@@ -146,6 +152,9 @@ class Server(
                             except Exception as e:
                                 # Отрефакторить
                                 try:
+                                    self.logger.warning(
+                                        f'Ошибка при приеме сообщения от {writer}\n{e}'
+                                    )
                                     connection_lost_username = list(
                                         self.names.keys())[list(self.names.values()).index(writer)]
                                     self._end_connection_with_client(connection_lost_username)
@@ -156,6 +165,9 @@ class Server(
                         try:
                             self.process_message(message, getters_list)
                         except ConnectionError:
+                            self.logger.warning(
+                                f'Потеряно соединение с {message[SENDER]}'
+                            )
                             self._end_connection_with_client(message[DESTINATION])
 
                     self.messages.clear()
@@ -183,99 +195,106 @@ class Server(
         некорректно, то отправляет ответ пользователю
         """
         message = get_message(client_sock)
-
-        # Если сообщение представление, то отвечаем пользователю
-        if message[ACTION] == PRESENCE:
-            if message[SENDER] not in self.names.keys():
-                authenticate = self.server_storage.authenticate(
-                    message[SENDER],
-                    message[MESSAGE_TEXT],
-                )
-                if authenticate:
-                    self.names[message[SENDER]] = client_sock
-                    ip, port = client_sock.getpeername()
-                    self.server_storage.login(message[SENDER], ip, port)
-                    response = RESPONSE_200
-                    response[MESSAGE_TEXT] = 'Добро пожаловать!'
-                    send_message(client_sock, response)
-                else:
-                    response = RESPONSE_401
-                    send_message(client_sock, response)
-                    self.client_sockets.remove(client_sock)
-                    client_sock.close()
-            else:
-                send_message(client_sock, RESPONSE_201)
-
-        # Сообщение о выходе
-        elif message[ACTION] == EXIT:
-            response = RESPONSE_200
-            response[MESSAGE_TEXT] = 'До свидания!'
-            send_message(client_sock, response)
-            self._end_connection_with_client(message[SENDER])
-
-        # Сообщение клиент-клиент
-        elif (message[ACTION] == MESSAGE and
-              message[SENDER] and
-              message[DESTINATION] and
-              message[TIME]):
-            self.messages.append(message)
-
-        # Запрос на список контактов
-        elif message[ACTION] == CONTACTS:
-            contacts = self.server_storage.get_user_contacts(
-                message[SENDER]
-            )
-            response = RESPONSE_200
-            response[MESSAGE_TEXT] = contacts
-            send_message(client_sock, response)
-
-        # Добавление контакта
-        elif message[ACTION] == ADD_CONTACT:
-            response = RESPONSE_200
-            if message[SENDER] == message[MESSAGE_TEXT]:
-                response[MESSAGE_TEXT] = 'Вы не можете добавить сами себя'
-            else:
-                created = self.server_storage.add_contact(
-                    message[SENDER],
-                    message[MESSAGE_TEXT],
-                )
-                if created:
-                    response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} добавлен'
-                else:
-                    response[MESSAGE_TEXT] = f'Ошибка при добавлении пользователя'
-            send_message(client_sock, response)
-
-        # Удаление контакта
-        elif message[ACTION] == DEL_CONTACT:
-            deleted = self.server_storage.del_contact(
-                message[SENDER],
-                message[MESSAGE_TEXT],
-            )
-            response = RESPONSE_200
-            if deleted:
-                response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} удален'
-            else:
-                response[MESSAGE_TEXT] = f'Ошибка при удалении пользователя'
-            send_message(client_sock, response)
-        
-        # Регистрация
-        elif message[ACTION] == REGISTER:
-            registered = self.server_storage.register_user(
-                message[SENDER],
-                message[MESSAGE_TEXT],
-            )
-            response = RESPONSE_200
-            if registered == NICKNAME_IN_USE:
-                response = RESPONSE_201
-            elif registered:
-                response[MESSAGE_TEXT] = f'{message[SENDER]} Вы зарегистрированы!'
-            else:
-                response[MESSAGE_TEXT] = f'Ошибка при регистрации'
+        if message is None:
+            response = RESPONSE_400
+            response[MESSAGE_TEXT] = 'Ошибка при отправке сообщения'
             send_message(client_sock, response)
         else:
-            response = RESPONSE_400
-            response[MESSAGE_TEXT] = 'Некорректный запрос'
-            send_message(client_sock, response)
+            # Если сообщение представление, то отвечаем пользователю
+            if message[ACTION] == PRESENCE:
+                if message[SENDER] not in self.names.keys():
+                    authenticate = self.server_storage.authenticate(
+                        message[SENDER],
+                        message[MESSAGE_TEXT],
+                    )
+                    if authenticate:
+                        self.names[message[SENDER]] = client_sock
+                        ip, port = client_sock.getpeername()
+                        self.server_storage.login(message[SENDER], ip, port)
+                        response = RESPONSE_200
+                        response[MESSAGE_TEXT] = 'Добро пожаловать!'
+                        send_message(client_sock, response)
+                    else:
+                        response = RESPONSE_401
+                        send_message(client_sock, response)
+                        self.client_sockets.remove(client_sock)
+                        client_sock.close()
+                else:
+                    send_message(client_sock, RESPONSE_201)
+
+            # Сообщение о выходе
+            elif message[ACTION] == EXIT:
+                response = RESPONSE_200
+                response[MESSAGE_TEXT] = 'До свидания!'
+                send_message(client_sock, response)
+                self._end_connection_with_client(message[SENDER])
+
+            # Сообщение клиент-клиент
+            elif (message[ACTION] == MESSAGE and
+                  message[SENDER] and
+                  message[DESTINATION] and
+                  message[TIME]):
+                self.messages.append(message)
+
+            # Запрос на список контактов
+            elif message[ACTION] == CONTACTS:
+                contacts = self.server_storage.get_user_contacts(
+                    message[SENDER]
+                )
+                response = RESPONSE_200
+                response[MESSAGE_TEXT] = contacts
+                send_message(client_sock, response)
+
+            # Добавление контакта
+            elif message[ACTION] == ADD_CONTACT:
+                response = RESPONSE_200
+                if message[SENDER] == message[MESSAGE_TEXT]:
+                    response[MESSAGE_TEXT] = 'Вы не можете добавить сами себя'
+                else:
+                    created = self.server_storage.add_contact(
+                        message[SENDER],
+                        message[MESSAGE_TEXT],
+                    )
+                    if created:
+                        response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} добавлен'
+                    else:
+                        response[MESSAGE_TEXT] = f'Ошибка при добавлении пользователя'
+                send_message(client_sock, response)
+
+            # Удаление контакта
+            elif message[ACTION] == DEL_CONTACT:
+                deleted = self.server_storage.del_contact(
+                    message[SENDER],
+                    message[MESSAGE_TEXT],
+                )
+                response = RESPONSE_200
+                if deleted:
+                    response[MESSAGE_TEXT] = f'Пользователь {message[MESSAGE_TEXT]} удален'
+                else:
+                    response[MESSAGE_TEXT] = f'Ошибка при удалении пользователя'
+                send_message(client_sock, response)
+
+            # Регистрация
+            elif message[ACTION] == REGISTER:
+                registered = self.server_storage.register_user(
+                    message[SENDER],
+                    message[MESSAGE_TEXT],
+                )
+                response = RESPONSE_200
+                if registered == NICKNAME_IN_USE:
+                    response = RESPONSE_201
+                elif registered:
+                    response[MESSAGE_TEXT] = f'{message[SENDER]} Вы зарегистрированы!'
+                    self.logger.info(
+                        f'Пользователь {message[SENDER]} зарегистрирован'
+                    )
+                else:
+                    response[MESSAGE_TEXT] = f'Ошибка при регистрации'
+                send_message(client_sock, response)
+            else:
+                response = RESPONSE_400
+                response[MESSAGE_TEXT] = 'Некорректный запрос'
+                send_message(client_sock, response)
 
     def get_userlist(self):
         users = self.server_storage.get_userlist()
